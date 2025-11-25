@@ -265,43 +265,41 @@
             opacity: 0.8;
         }
 
-        .minimap {
-            position: fixed;
-            bottom: 30px;
-            left: 30px;
-            width: 150px;
-            height: 150px;
-            background: rgba(20, 15, 10, 0.85);
-            border-radius: 8px;
-            border: 2px solid rgba(200, 160, 100, 0.3);
-            z-index: 100;
-            overflow: hidden;
-        }
-
-        .minimap-canvas {
-            width: 100%;
-            height: 100%;
-        }
-
-        .cactus-label {
-            color: #f5e6d3;
+        .cactus-plaque {
             font-family: 'Georgia', serif;
-            font-size: 14px;
-            padding: 6px 12px;
-            background: rgba(20, 15, 10, 0.85);
-            backdrop-filter: blur(5px);
-            border-radius: 20px;
-            border: 1px solid rgba(200, 160, 100, 0.3);
-            white-space: nowrap;
+            padding: 12px 16px;
+            background: rgba(20, 15, 10, 0.92);
+            backdrop-filter: blur(8px);
+            border-radius: 8px;
+            border: 2px solid rgba(200, 160, 100, 0.4);
+            border-bottom: 3px solid rgba(139, 90, 43, 0.6);
             pointer-events: none;
             opacity: 0;
-            transition: opacity 0.3s ease;
+            transition: opacity 0.4s ease;
             text-shadow: 0 1px 3px rgba(0,0,0,0.5);
-            letter-spacing: 0.05em;
+            max-width: 240px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
         }
 
-        .cactus-label.visible {
+        .cactus-plaque.visible {
             opacity: 1;
+        }
+
+        .cactus-plaque .plaque-name {
+            color: #f5e6d3;
+            font-size: 15px;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            margin-bottom: 6px;
+            border-bottom: 1px solid rgba(200, 160, 100, 0.3);
+            padding-bottom: 6px;
+        }
+
+        .cactus-plaque .plaque-desc {
+            color: #c9b896;
+            font-size: 12px;
+            line-height: 1.5;
+            font-style: italic;
         }
     </style>
 </head>
@@ -336,16 +334,12 @@
 
     <div class="info-panel" id="infoPanel">
         <h3>Welcome to the Garden</h3>
-        <p>Explore 9 unique cactus species along this desert street. Press 1-9 to learn about each type!</p>
+        <p>Explore 11 unique cactus species along this desert street. Walk up to each cactus to read its plaque!</p>
     </div>
 
     <div class="controls-hint">
         WASD to walk • Mouse to look • Shift to run • Space to jump<br>
         Press ESC to release mouse
-    </div>
-
-    <div class="minimap">
-        <canvas class="minimap-canvas" id="minimapCanvas" width="150" height="150"></canvas>
     </div>
 
     <script type="importmap">
@@ -403,8 +397,8 @@
         const velocity = new THREE.Vector3();
         const direction = new THREE.Vector3();
         let canJump = true;
-        const WALK_SPEED = 8;
-        const SPRINT_SPEED = 16;
+        const WALK_SPEED = 4;
+        const SPRINT_SPEED = 8;
         const JUMP_FORCE = 12;
         const GRAVITY = 30;
         const PLAYER_HEIGHT = 1.7;
@@ -514,6 +508,101 @@
         const sky = new THREE.Mesh(skyGeometry, skyMaterial);
         scene.add(sky);
 
+        // Distant desert mountains
+        function createMountainRange(distance, height, color, segments = 20) {
+            const points = [];
+            for (let i = 0; i <= segments; i++) {
+                const angle = (i / segments) * Math.PI * 2;
+                const variation = Math.sin(i * 1.5) * 0.3 + Math.sin(i * 3.7) * 0.2 + Math.sin(i * 0.5) * 0.5;
+                const h = height * (0.5 + variation * 0.5);
+                points.push(new THREE.Vector3(
+                    Math.cos(angle) * distance,
+                    h,
+                    Math.sin(angle) * distance
+                ));
+            }
+
+            const shape = new THREE.Shape();
+            shape.moveTo(points[0].x, 0);
+            points.forEach(p => shape.lineTo(p.x, p.y));
+            shape.lineTo(points[points.length - 1].x, 0);
+
+            // Create a circular mountain range using cylinders with varying heights
+            const mountainGroup = new THREE.Group();
+            const mountainMaterial = new THREE.MeshStandardMaterial({
+                color: color,
+                roughness: 0.9,
+                metalness: 0,
+                flatShading: true
+            });
+
+            for (let i = 0; i < 60; i++) {
+                const angle = (i / 60) * Math.PI * 2;
+                const variation = Math.sin(i * 0.8) * 0.4 + Math.sin(i * 2.1) * 0.3 + Math.sin(i * 0.3) * 0.3;
+                const h = height * (0.6 + variation * 0.4);
+                const width = height * (0.3 + Math.random() * 0.2);
+
+                const peakGeometry = new THREE.ConeGeometry(width, h, 4);
+                const peak = new THREE.Mesh(peakGeometry, mountainMaterial);
+                peak.position.set(
+                    Math.cos(angle) * distance + (Math.random() - 0.5) * 10,
+                    h / 2,
+                    Math.sin(angle) * distance + (Math.random() - 0.5) * 10
+                );
+                peak.rotation.y = Math.random() * Math.PI;
+                mountainGroup.add(peak);
+            }
+
+            return mountainGroup;
+        }
+
+        // Add layered mountain ranges
+        const farMountains = createMountainRange(120, 25, 0x8b7355);
+        scene.add(farMountains);
+
+        const midMountains = createMountainRange(90, 18, 0x9c8465);
+        scene.add(midMountains);
+
+        const nearMountains = createMountainRange(65, 12, 0xad9578);
+        scene.add(nearMountains);
+
+        // Desert floor extending to horizon (large plane under everything)
+        const desertGeometry = new THREE.PlaneGeometry(400, 400);
+        const desertMaterial = new THREE.MeshStandardMaterial({
+            color: 0xc9a882,
+            roughness: 1,
+            metalness: 0
+        });
+        const desert = new THREE.Mesh(desertGeometry, desertMaterial);
+        desert.rotation.x = -Math.PI / 2;
+        desert.position.y = -0.02;
+        desert.receiveShadow = true;
+        scene.add(desert);
+
+        // Scattered distant cacti silhouettes
+        const distantCactusGeometry = new THREE.CylinderGeometry(0.3, 0.4, 4, 6);
+        const distantCactusMaterial = new THREE.MeshStandardMaterial({
+            color: 0x3d5a3d,
+            roughness: 0.8
+        });
+
+        for (let i = 0; i < 40; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 35 + Math.random() * 25;
+            const cactus = new THREE.Mesh(distantCactusGeometry, distantCactusMaterial);
+            cactus.position.set(
+                Math.cos(angle) * dist,
+                2,
+                Math.sin(angle) * dist
+            );
+            cactus.scale.set(
+                0.5 + Math.random() * 0.5,
+                0.5 + Math.random() * 1,
+                0.5 + Math.random() * 0.5
+            );
+            scene.add(cactus);
+        }
+
         // Ground - street path
         const STREET_WIDTH = 15;
         const STREET_LENGTH = 60;
@@ -553,7 +642,9 @@
             mediumGreen: 0x3d7a4d,
             lightGreen: 0x4a9a5a,
             blueGreen: 0x3a6b5a,
-            yellowGreen: 0x5a8a3a
+            yellowGreen: 0x5a8a3a,
+            powderBlue: 0x4a7a8a,
+            sanPedroGreen: 0x4a8a5a
         };
 
         // Create cactus materials
@@ -1229,6 +1320,206 @@
         }
 
         // ============================================
+        // SAN PEDRO CACTUS (Tall smooth columnar)
+        // ============================================
+        function createSanPedro(height = 4) {
+            const group = new THREE.Group();
+            const material = createCactusMaterial(cactusColors.sanPedroGreen);
+
+            // San Pedro has 6-8 ribs, smooth appearance
+            const ribs = 7;
+            const radius = 0.25;
+
+            // Main column with subtle ribs
+            const bodyGeometry = new THREE.CylinderGeometry(radius, radius * 0.95, height, 32, 16);
+            const positions = bodyGeometry.attributes.position.array;
+
+            for (let i = 0; i < positions.length; i += 3) {
+                const x = positions[i];
+                const y = positions[i + 1];
+                const z = positions[i + 2];
+                const angle = Math.atan2(z, x);
+
+                // Subtle rib pattern
+                const ribDepth = 0.04;
+                const ribFactor = 1 + Math.cos(angle * ribs) * ribDepth;
+
+                positions[i] *= ribFactor;
+                positions[i + 2] *= ribFactor;
+            }
+
+            bodyGeometry.computeVertexNormals();
+
+            const body = new THREE.Mesh(bodyGeometry, material);
+            body.position.y = height / 2;
+            body.castShadow = true;
+            body.receiveShadow = true;
+            group.add(body);
+
+            // Rounded top
+            const topGeometry = new THREE.SphereGeometry(radius, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+            const top = new THREE.Mesh(topGeometry, material);
+            top.position.y = height;
+            top.castShadow = true;
+            group.add(top);
+
+            // Small areoles with tiny spines along ribs
+            for (let rib = 0; rib < ribs; rib++) {
+                const ribAngle = (rib / ribs) * Math.PI * 2;
+                for (let row = 0; row < Math.floor(height * 2); row++) {
+                    const y = (row / (height * 2)) * height * 0.9 + height * 0.05;
+                    const r = radius * (1 + Math.cos(ribAngle * ribs) * 0.04);
+
+                    // Small areole with very short spines
+                    const areoleGroup = new THREE.Group();
+                    const areoleMaterial = new THREE.MeshStandardMaterial({ color: 0x8B7355, roughness: 0.9 });
+                    const areoleGeom = new THREE.SphereGeometry(0.015, 4, 4);
+                    const areole = new THREE.Mesh(areoleGeom, areoleMaterial);
+                    areoleGroup.add(areole);
+
+                    // Very short brownish spines (San Pedro has minimal spines)
+                    for (let s = 0; s < 3; s++) {
+                        const spineGeometry = new THREE.ConeGeometry(0.003, 0.02, 3);
+                        spineGeometry.translate(0, 0.01, 0);
+                        const spine = new THREE.Mesh(spineGeometry, new THREE.MeshStandardMaterial({
+                            color: 0xd4a574,
+                            roughness: 0.7
+                        }));
+                        const sAngle = (s / 3) * Math.PI * 2;
+                        spine.rotation.set(Math.PI / 3, sAngle, 0);
+                        areoleGroup.add(spine);
+                    }
+
+                    areoleGroup.position.set(Math.cos(ribAngle) * r, y, Math.sin(ribAngle) * r);
+                    group.add(areoleGroup);
+                }
+            }
+
+            // Sometimes add a branch
+            if (Math.random() > 0.5) {
+                const branchHeight = height * 0.5;
+                const branch = createSanPedroBranch(branchHeight);
+                const branchAngle = Math.random() * Math.PI * 2;
+                branch.position.set(Math.cos(branchAngle) * 0.2, height * 0.4, Math.sin(branchAngle) * 0.2);
+                branch.rotation.z = Math.PI / 6;
+                branch.rotation.y = branchAngle;
+                group.add(branch);
+            }
+
+            return group;
+        }
+
+        function createSanPedroBranch(height) {
+            const group = new THREE.Group();
+            const material = createCactusMaterial(cactusColors.sanPedroGreen);
+            const radius = 0.18;
+
+            const bodyGeometry = new THREE.CylinderGeometry(radius, radius * 0.9, height, 24, 8);
+            const body = new THREE.Mesh(bodyGeometry, material);
+            body.position.y = height / 2;
+            body.castShadow = true;
+            group.add(body);
+
+            const topGeometry = new THREE.SphereGeometry(radius, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2);
+            const top = new THREE.Mesh(topGeometry, material);
+            top.position.y = height;
+            top.castShadow = true;
+            group.add(top);
+
+            return group;
+        }
+
+        // ============================================
+        // BLUE TORCH CACTUS (Striking blue columnar)
+        // ============================================
+        function createBlueTorch(height = 3.5) {
+            const group = new THREE.Group();
+            const material = createCactusMaterial(cactusColors.powderBlue);
+
+            // Blue torch has prominent ribs
+            const ribs = 12;
+            const radius = 0.2;
+
+            // Main column with pronounced ribs
+            const bodyGeometry = new THREE.CylinderGeometry(radius, radius * 0.9, height, 32, 16);
+            const positions = bodyGeometry.attributes.position.array;
+
+            for (let i = 0; i < positions.length; i += 3) {
+                const x = positions[i];
+                const y = positions[i + 1];
+                const z = positions[i + 2];
+                const angle = Math.atan2(z, x);
+
+                // Prominent rib pattern
+                const ribDepth = 0.1;
+                const ribFactor = 1 + Math.cos(angle * ribs) * ribDepth;
+
+                positions[i] *= ribFactor;
+                positions[i + 2] *= ribFactor;
+            }
+
+            bodyGeometry.computeVertexNormals();
+
+            const body = new THREE.Mesh(bodyGeometry, material);
+            body.position.y = height / 2;
+            body.castShadow = true;
+            body.receiveShadow = true;
+            group.add(body);
+
+            // Rounded blue top
+            const topGeometry = new THREE.SphereGeometry(radius, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+            const top = new THREE.Mesh(topGeometry, material);
+            top.position.y = height;
+            top.castShadow = true;
+            group.add(top);
+
+            // Golden-brown spines along ribs
+            const goldenSpineMaterial = new THREE.MeshStandardMaterial({
+                color: 0xdaa520,
+                roughness: 0.4,
+                metalness: 0.1
+            });
+
+            for (let rib = 0; rib < ribs; rib += 2) {
+                const ribAngle = (rib / ribs) * Math.PI * 2;
+                for (let row = 0; row < Math.floor(height * 3); row++) {
+                    const y = (row / (height * 3)) * height * 0.9 + height * 0.05;
+                    const r = radius * (1 + Math.cos(ribAngle * ribs) * 0.1);
+
+                    // Spine cluster
+                    const clusterGroup = new THREE.Group();
+                    for (let s = 0; s < 6; s++) {
+                        const spineLength = 0.06 + Math.random() * 0.04;
+                        const spineGeometry = new THREE.ConeGeometry(0.005, spineLength, 4);
+                        spineGeometry.translate(0, spineLength / 2, 0);
+                        const spine = new THREE.Mesh(spineGeometry, goldenSpineMaterial);
+                        const sAngle = (s / 6) * Math.PI * 2;
+                        spine.rotation.set(Math.PI / 4 + Math.random() * 0.2, sAngle, 0);
+                        clusterGroup.add(spine);
+                    }
+
+                    clusterGroup.position.set(Math.cos(ribAngle) * r, y, Math.sin(ribAngle) * r);
+                    clusterGroup.lookAt(Math.cos(ribAngle) * r * 2, y + 0.1, Math.sin(ribAngle) * r * 2);
+                    group.add(clusterGroup);
+                }
+            }
+
+            // Woolly top (characteristic of blue torch)
+            const woolGeometry = new THREE.SphereGeometry(radius * 0.6, 12, 12);
+            const woolMaterial = new THREE.MeshStandardMaterial({
+                color: 0xf5f5dc,
+                roughness: 1,
+                metalness: 0
+            });
+            const wool = new THREE.Mesh(woolGeometry, woolMaterial);
+            wool.position.y = height + 0.05;
+            wool.scale.y = 0.4;
+            group.add(wool);
+
+            return group;
+        }
+
+        // ============================================
         // HELPER FUNCTIONS
         // ============================================
 
@@ -1386,45 +1677,52 @@
 
         // Store labeled cacti for distance-based visibility
         const labeledCacti = [];
-        const LABEL_DISTANCE = 12; // Distance at which labels become visible
+        const LABEL_DISTANCE = 8; // Distance at which plaques become visible
 
-        // Create a label for a cactus
-        function createCactusLabel(name, height) {
-            const labelDiv = document.createElement('div');
-            labelDiv.className = 'cactus-label';
-            labelDiv.textContent = name;
-
-            const label = new CSS2DObject(labelDiv);
-            label.position.set(0, height + 0.5, 0);
-            label.userData.element = labelDiv;
-
-            return label;
-        }
-
-        // Cactus type names
-        const cactusTypeNames = {
-            saguaro: 'Saguaro',
-            barrel: 'Barrel Cactus',
-            goldenBarrel: 'Golden Barrel',
-            pricklyPear: 'Prickly Pear',
-            organPipe: 'Organ Pipe',
-            cholla: 'Cholla',
-            oldMan: 'Old Man Cactus',
-            totemPole: 'Totem Pole',
-            hedgehog: 'Hedgehog Cactus'
+        // Cactus info for plaques
+        const cactusInfo = {
+            saguaro: { name: 'Saguaro', desc: 'The iconic giant of the Sonoran Desert. Can live over 150 years and grow up to 40 feet tall.' },
+            barrel: { name: 'Barrel Cactus', desc: 'Known for their cylindrical shape. They lean toward the south, earning the nickname "compass cactus."' },
+            goldenBarrel: { name: 'Golden Barrel', desc: 'Called "Mother-in-Law\'s Cushion" due to its fierce golden spines. Endangered in the wild.' },
+            pricklyPear: { name: 'Prickly Pear', desc: 'Distinguished by flat, paddle-shaped stems. Both fruit and pads are edible.' },
+            organPipe: { name: 'Organ Pipe', desc: 'Named for their resemblance to pipe organs. They bloom at night with flowers pollinated by bats.' },
+            cholla: { name: 'Cholla', desc: 'Known as "Teddy Bear" or "Jumping" cholla. Covered in dense spines that appear fuzzy. Very painful to touch!' },
+            oldMan: { name: 'Old Man Cactus', desc: 'Covered in long white hair-like spines resembling an old man\'s beard. Native to Mexico, can live 200+ years.' },
+            totemPole: { name: 'Totem Pole', desc: 'A spineless mutation with smooth bumpy columns. Named for its resemblance to Native American totem poles.' },
+            hedgehog: { name: 'Hedgehog Cactus', desc: 'Small clustering cactus with short, dense spines. Produces vibrant flowers in spring.' },
+            sanPedro: { name: 'San Pedro', desc: 'Native to the Andes mountains. Smooth columns with 6-8 ribs and minimal spines. Sacred to indigenous cultures.' },
+            blueTorch: { name: 'Blue Torch', desc: 'Striking blue-green columnar cactus from Brazil. Features prominent ribs, golden spines, and a woolly crown.' }
         };
 
-        // Helper to add cactus with collision tracking and label
+        // Create a plaque for a cactus
+        function createCactusPlaque(type, height) {
+            const info = cactusInfo[type] || { name: type, desc: '' };
+
+            const plaqueDiv = document.createElement('div');
+            plaqueDiv.className = 'cactus-plaque';
+            plaqueDiv.innerHTML = `
+                <div class="plaque-name">${info.name}</div>
+                <div class="plaque-desc">${info.desc}</div>
+            `;
+
+            const plaque = new CSS2DObject(plaqueDiv);
+            plaque.position.set(0, height + 0.5, 0);
+            plaque.userData.element = plaqueDiv;
+
+            return plaque;
+        }
+
+        // Helper to add cactus with collision tracking and plaque
         function addCactus(cactus, x, z, radius = 1, type = 'saguaro', labelHeight = 3) {
             cactus.position.set(x, 0, z);
             cactus.rotation.y = Math.random() * Math.PI * 2;
             scene.add(cactus);
             cactusPositions.push({ x, z, radius });
 
-            // Add label
-            const label = createCactusLabel(cactusTypeNames[type] || type, labelHeight);
-            cactus.add(label);
-            labeledCacti.push({ cactus, label, x, z });
+            // Add plaque
+            const plaque = createCactusPlaque(type, labelHeight);
+            cactus.add(plaque);
+            labeledCacti.push({ cactus, plaque, x, z });
         }
 
         // Expanded street layout with all cactus types
@@ -1462,6 +1760,12 @@
         addCactus(createHedgehog(4), -SIDE_OFFSET + 1.5, -19, 0.5, 'hedgehog', 0.7);
         addCactus(createHedgehog(5), SIDE_OFFSET - 1.5, 5, 0.5, 'hedgehog', 0.8);
 
+        // New cacti - San Pedro and Blue Torch
+        addCactus(createSanPedro(4.5), -SIDE_OFFSET - 1, 0, 0.8, 'sanPedro', 4.5);
+        addCactus(createSanPedro(3.8), SIDE_OFFSET + 1, -5, 0.8, 'sanPedro', 3.8);
+        addCactus(createBlueTorch(3.5), -SIDE_OFFSET - 1, 12, 0.7, 'blueTorch', 3.5);
+        addCactus(createBlueTorch(4), SIDE_OFFSET + 1, 16, 0.7, 'blueTorch', 4);
+
         // Scattered rocks (much fewer)
         const rockPositions = [
             { x: -3, z: -25 }, { x: 2, z: -18 }, { x: -1, z: -8 },
@@ -1486,60 +1790,381 @@
         }
 
         // ============================================
-        // MINIMAP
+        // WOODEN FENCE
         // ============================================
-        const minimapCanvas = document.getElementById('minimapCanvas');
-        const minimapCtx = minimapCanvas.getContext('2d');
+        const fenceGroup = new THREE.Group();
 
-        function updateMinimap() {
-            const ctx = minimapCtx;
-            const size = 150;
-            const scaleX = size / STREET_WIDTH;
-            const scaleZ = size / STREET_LENGTH;
+        // Fence materials
+        const woodMaterial = new THREE.MeshStandardMaterial({
+            color: 0x8B4513,
+            roughness: 0.9,
+            metalness: 0
+        });
+        const darkWoodMaterial = new THREE.MeshStandardMaterial({
+            color: 0x654321,
+            roughness: 0.85,
+            metalness: 0
+        });
 
-            // Background
-            ctx.fillStyle = '#2a1f15';
-            ctx.fillRect(0, 0, size, size);
+        // Fence dimensions
+        const postHeight = 0.8;
+        const postWidth = 0.08;
+        const railHeight = 0.05;
+        const railDepth = 0.03;
+        const postSpacing = 2.5;
+        const fenceInset = 0.5; // How far inside the boundary
 
-            // Draw street outline
-            ctx.strokeStyle = 'rgba(200, 160, 100, 0.3)';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(2, 2, size - 4, size - 4);
+        const halfW = STREET_WIDTH / 2 - fenceInset;
+        const halfL = STREET_LENGTH / 2 - fenceInset;
 
-            // Draw cacti
-            ctx.fillStyle = '#4a7a4a';
-            cactusPositions.forEach(cactus => {
-                const x = size/2 + cactus.x * scaleX;
-                const y = size/2 + cactus.z * scaleZ;
-                const r = Math.max(3, cactus.radius * scaleX);
+        // Create fence post
+        function createFencePost(x, z) {
+            const postGeometry = new THREE.BoxGeometry(postWidth, postHeight, postWidth);
+            const post = new THREE.Mesh(postGeometry, darkWoodMaterial);
+            post.position.set(x, postHeight / 2, z);
+            post.castShadow = true;
+            post.receiveShadow = true;
 
-                ctx.beginPath();
-                ctx.arc(x, y, r, 0, Math.PI * 2);
-                ctx.fill();
-            });
+            // Pointed top
+            const capGeometry = new THREE.ConeGeometry(postWidth * 0.7, 0.1, 4);
+            const cap = new THREE.Mesh(capGeometry, darkWoodMaterial);
+            cap.position.set(x, postHeight + 0.05, z);
+            cap.rotation.y = Math.PI / 4;
+            cap.castShadow = true;
 
-            // Draw player
-            const playerX = size/2 + camera.position.x * scaleX;
-            const playerZ = size/2 + camera.position.z * scaleZ;
+            fenceGroup.add(post);
+            fenceGroup.add(cap);
+        }
 
-            // Player direction
-            const dir = new THREE.Vector3();
-            camera.getWorldDirection(dir);
-            const angle = Math.atan2(dir.x, dir.z);
+        // Create horizontal rail between two points
+        function createRail(x1, z1, x2, z2, height) {
+            const length = Math.sqrt((x2 - x1) ** 2 + (z2 - z1) ** 2);
+            const railGeometry = new THREE.BoxGeometry(length, railHeight, railDepth);
+            const rail = new THREE.Mesh(railGeometry, woodMaterial);
 
-            ctx.save();
-            ctx.translate(playerX, playerZ);
-            ctx.rotate(-angle);
+            rail.position.set((x1 + x2) / 2, height, (z1 + z2) / 2);
+            rail.rotation.y = Math.atan2(z2 - z1, x2 - x1);
+            rail.castShadow = true;
+            rail.receiveShadow = true;
 
-            ctx.fillStyle = '#f5e6d3';
-            ctx.beginPath();
-            ctx.moveTo(0, -6);
-            ctx.lineTo(-4, 4);
-            ctx.lineTo(4, 4);
-            ctx.closePath();
-            ctx.fill();
+            fenceGroup.add(rail);
+        }
 
-            ctx.restore();
+        // Build fence along all four sides
+        // Left side (x = -halfW)
+        for (let z = -halfL; z <= halfL; z += postSpacing) {
+            createFencePost(-halfW, z);
+        }
+        for (let z = -halfL; z < halfL; z += postSpacing) {
+            createRail(-halfW, z, -halfW, Math.min(z + postSpacing, halfL), postHeight * 0.7);
+            createRail(-halfW, z, -halfW, Math.min(z + postSpacing, halfL), postHeight * 0.35);
+        }
+
+        // Right side (x = halfW)
+        for (let z = -halfL; z <= halfL; z += postSpacing) {
+            createFencePost(halfW, z);
+        }
+        for (let z = -halfL; z < halfL; z += postSpacing) {
+            createRail(halfW, z, halfW, Math.min(z + postSpacing, halfL), postHeight * 0.7);
+            createRail(halfW, z, halfW, Math.min(z + postSpacing, halfL), postHeight * 0.35);
+        }
+
+        // Back side (z = -halfL)
+        for (let x = -halfW + postSpacing; x < halfW; x += postSpacing) {
+            createFencePost(x, -halfL);
+        }
+        for (let x = -halfW; x < halfW; x += postSpacing) {
+            createRail(x, -halfL, Math.min(x + postSpacing, halfW), -halfL, postHeight * 0.7);
+            createRail(x, -halfL, Math.min(x + postSpacing, halfW), -halfL, postHeight * 0.35);
+        }
+
+        // Front side (z = halfL)
+        for (let x = -halfW + postSpacing; x < halfW; x += postSpacing) {
+            createFencePost(x, halfL);
+        }
+        for (let x = -halfW; x < halfW; x += postSpacing) {
+            createRail(x, halfL, Math.min(x + postSpacing, halfW), halfL, postHeight * 0.7);
+            createRail(x, halfL, Math.min(x + postSpacing, halfW), halfL, postHeight * 0.35);
+        }
+
+        scene.add(fenceGroup);
+
+        // ============================================
+        // DESERT FOX (Fennec Fox)
+        // ============================================
+        const foxGroup = new THREE.Group();
+
+        // Fox materials
+        const foxFurMaterial = new THREE.MeshStandardMaterial({
+            color: 0xf4c67a,
+            roughness: 0.8,
+            metalness: 0
+        });
+        const foxBellyMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffefd5,
+            roughness: 0.9,
+            metalness: 0
+        });
+        const foxNoseMaterial = new THREE.MeshStandardMaterial({
+            color: 0x2a2a2a,
+            roughness: 0.5,
+            metalness: 0
+        });
+        const foxEyeMaterial = new THREE.MeshStandardMaterial({
+            color: 0x1a1a1a,
+            roughness: 0.3,
+            metalness: 0.1
+        });
+        const foxInnerEarMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffb6c1,
+            roughness: 0.9,
+            metalness: 0
+        });
+
+        // Body
+        const bodyGeometry = new THREE.SphereGeometry(0.18, 12, 10);
+        const body = new THREE.Mesh(bodyGeometry, foxFurMaterial);
+        body.scale.set(1.3, 0.9, 0.9);
+        body.position.y = 0.18;
+        body.castShadow = true;
+        foxGroup.add(body);
+
+        // Belly
+        const bellyGeometry = new THREE.SphereGeometry(0.12, 10, 8);
+        const belly = new THREE.Mesh(bellyGeometry, foxBellyMaterial);
+        belly.position.set(0, 0.13, 0.02);
+        belly.scale.set(1, 0.7, 0.8);
+        foxGroup.add(belly);
+
+        // Head
+        const headGeometry = new THREE.SphereGeometry(0.12, 12, 10);
+        const head = new THREE.Mesh(headGeometry, foxFurMaterial);
+        head.position.set(0.18, 0.26, 0);
+        head.scale.set(1.1, 1, 0.95);
+        head.castShadow = true;
+        foxGroup.add(head);
+
+        // Snout
+        const snoutGeometry = new THREE.ConeGeometry(0.05, 0.12, 8);
+        const snout = new THREE.Mesh(snoutGeometry, foxFurMaterial);
+        snout.position.set(0.32, 0.23, 0);
+        snout.rotation.z = -Math.PI / 2;
+        snout.castShadow = true;
+        foxGroup.add(snout);
+
+        // Nose
+        const noseGeometry = new THREE.SphereGeometry(0.018, 8, 8);
+        const nose = new THREE.Mesh(noseGeometry, foxNoseMaterial);
+        nose.position.set(0.38, 0.23, 0);
+        foxGroup.add(nose);
+
+        // Eyes
+        const eyeGeometry = new THREE.SphereGeometry(0.025, 8, 8);
+        const leftEye = new THREE.Mesh(eyeGeometry, foxEyeMaterial);
+        leftEye.position.set(0.26, 0.3, 0.06);
+        foxGroup.add(leftEye);
+
+        const rightEye = new THREE.Mesh(eyeGeometry, foxEyeMaterial);
+        rightEye.position.set(0.26, 0.3, -0.06);
+        foxGroup.add(rightEye);
+
+        // Eye highlights
+        const highlightGeometry = new THREE.SphereGeometry(0.008, 6, 6);
+        const highlightMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const leftHighlight = new THREE.Mesh(highlightGeometry, highlightMaterial);
+        leftHighlight.position.set(0.275, 0.31, 0.055);
+        foxGroup.add(leftHighlight);
+        const rightHighlight = new THREE.Mesh(highlightGeometry, highlightMaterial);
+        rightHighlight.position.set(0.275, 0.31, -0.055);
+        foxGroup.add(rightHighlight);
+
+        // Big ears (characteristic of fennec fox)
+        const earGeometry = new THREE.ConeGeometry(0.06, 0.18, 8);
+        const leftEar = new THREE.Mesh(earGeometry, foxFurMaterial);
+        leftEar.position.set(0.12, 0.42, 0.06);
+        leftEar.rotation.x = 0.2;
+        leftEar.rotation.z = 0.15;
+        leftEar.castShadow = true;
+        foxGroup.add(leftEar);
+
+        const rightEar = new THREE.Mesh(earGeometry, foxFurMaterial);
+        rightEar.position.set(0.12, 0.42, -0.06);
+        rightEar.rotation.x = -0.2;
+        rightEar.rotation.z = 0.15;
+        rightEar.castShadow = true;
+        foxGroup.add(rightEar);
+
+        // Inner ears
+        const innerEarGeometry = new THREE.ConeGeometry(0.035, 0.12, 8);
+        const leftInnerEar = new THREE.Mesh(innerEarGeometry, foxInnerEarMaterial);
+        leftInnerEar.position.set(0.13, 0.41, 0.06);
+        leftInnerEar.rotation.x = 0.2;
+        leftInnerEar.rotation.z = 0.15;
+        foxGroup.add(leftInnerEar);
+
+        const rightInnerEar = new THREE.Mesh(innerEarGeometry, foxInnerEarMaterial);
+        rightInnerEar.position.set(0.13, 0.41, -0.06);
+        rightInnerEar.rotation.x = -0.2;
+        rightInnerEar.rotation.z = 0.15;
+        foxGroup.add(rightInnerEar);
+
+        // Legs
+        const legGeometry = new THREE.CylinderGeometry(0.025, 0.02, 0.12, 6);
+        const pawGeometry = new THREE.SphereGeometry(0.025, 8, 6);
+
+        // Front legs
+        const frontLeftLeg = new THREE.Mesh(legGeometry, foxFurMaterial);
+        frontLeftLeg.position.set(0.1, 0.06, 0.08);
+        frontLeftLeg.castShadow = true;
+        foxGroup.add(frontLeftLeg);
+
+        const frontLeftPaw = new THREE.Mesh(pawGeometry, foxFurMaterial);
+        frontLeftPaw.position.set(0.1, 0.01, 0.08);
+        frontLeftPaw.scale.y = 0.6;
+        foxGroup.add(frontLeftPaw);
+
+        const frontRightLeg = new THREE.Mesh(legGeometry, foxFurMaterial);
+        frontRightLeg.position.set(0.1, 0.06, -0.08);
+        frontRightLeg.castShadow = true;
+        foxGroup.add(frontRightLeg);
+
+        const frontRightPaw = new THREE.Mesh(pawGeometry, foxFurMaterial);
+        frontRightPaw.position.set(0.1, 0.01, -0.08);
+        frontRightPaw.scale.y = 0.6;
+        foxGroup.add(frontRightPaw);
+
+        // Back legs
+        const backLeftLeg = new THREE.Mesh(legGeometry, foxFurMaterial);
+        backLeftLeg.position.set(-0.12, 0.06, 0.07);
+        backLeftLeg.castShadow = true;
+        foxGroup.add(backLeftLeg);
+
+        const backLeftPaw = new THREE.Mesh(pawGeometry, foxFurMaterial);
+        backLeftPaw.position.set(-0.12, 0.01, 0.07);
+        backLeftPaw.scale.y = 0.6;
+        foxGroup.add(backLeftPaw);
+
+        const backRightLeg = new THREE.Mesh(legGeometry, foxFurMaterial);
+        backRightLeg.position.set(-0.12, 0.06, -0.07);
+        backRightLeg.castShadow = true;
+        foxGroup.add(backRightLeg);
+
+        const backRightPaw = new THREE.Mesh(pawGeometry, foxFurMaterial);
+        backRightPaw.position.set(-0.12, 0.01, -0.07);
+        backRightPaw.scale.y = 0.6;
+        foxGroup.add(backRightPaw);
+
+        // Fluffy tail
+        const tailGeometry = new THREE.SphereGeometry(0.1, 10, 8);
+        const tail = new THREE.Mesh(tailGeometry, foxFurMaterial);
+        tail.position.set(-0.3, 0.2, 0);
+        tail.scale.set(1.8, 0.8, 0.7);
+        tail.castShadow = true;
+        foxGroup.add(tail);
+
+        // Tail tip (white)
+        const tailTipGeometry = new THREE.SphereGeometry(0.05, 8, 6);
+        const tailTip = new THREE.Mesh(tailTipGeometry, foxBellyMaterial);
+        tailTip.position.set(-0.42, 0.2, 0);
+        tailTip.scale.set(1.3, 0.9, 0.8);
+        foxGroup.add(tailTip);
+
+        // Scale fox to appropriate size
+        foxGroup.scale.set(1.0, 1.0, 1.0);
+
+        // Fox movement state
+        const foxState = {
+            x: 0,
+            z: -10,
+            targetX: 3,
+            targetZ: 5,
+            angle: 0,
+            speed: 1.5,
+            isRunning: true,
+            waitTime: 0,
+            runTime: 0,
+            legPhase: 0
+        };
+
+        // Pick a new random target for the fox
+        function pickFoxTarget() {
+            const margin = 3;
+            const maxX = STREET_WIDTH / 2 - margin;
+            const maxZ = STREET_LENGTH / 2 - margin;
+            foxState.targetX = (Math.random() - 0.5) * 2 * maxX;
+            foxState.targetZ = (Math.random() - 0.5) * 2 * maxZ;
+        }
+
+        foxGroup.position.set(foxState.x, 0, foxState.z);
+        scene.add(foxGroup);
+
+        // Store leg references for animation
+        const foxLegs = {
+            frontLeft: frontLeftLeg,
+            frontRight: frontRightLeg,
+            backLeft: backLeftLeg,
+            backRight: backRightLeg
+        };
+
+        // Update fox animation
+        function updateFox(delta) {
+            const dx = foxState.targetX - foxState.x;
+            const dz = foxState.targetZ - foxState.z;
+            const distance = Math.sqrt(dx * dx + dz * dz);
+
+            if (distance < 0.3) {
+                // Reached target, wait then pick new one
+                foxState.isRunning = false;
+                foxState.waitTime += delta;
+
+                // Idle animation - slight ear twitch
+                leftEar.rotation.z = 0.15 + Math.sin(foxState.waitTime * 5) * 0.05;
+                rightEar.rotation.z = 0.15 + Math.sin(foxState.waitTime * 5 + 1) * 0.05;
+
+                // Tail gentle wag
+                tail.rotation.y = Math.sin(foxState.waitTime * 3) * 0.15;
+                tailTip.rotation.y = Math.sin(foxState.waitTime * 3) * 0.15;
+
+                if (foxState.waitTime > 1.5 + Math.random() * 2) {
+                    pickFoxTarget();
+                    foxState.waitTime = 0;
+                    foxState.isRunning = true;
+                }
+            } else {
+                // Move toward target
+                foxState.isRunning = true;
+                const moveSpeed = foxState.speed * delta;
+                const moveX = (dx / distance) * moveSpeed;
+                const moveZ = (dz / distance) * moveSpeed;
+
+                foxState.x += moveX;
+                foxState.z += moveZ;
+
+                // Face direction of movement
+                foxState.angle = Math.atan2(-moveZ, moveX);
+
+                // Running leg animation
+                foxState.legPhase += delta * 15;
+                const legSwing = Math.sin(foxState.legPhase) * 0.5;
+
+                foxLegs.frontLeft.rotation.x = legSwing;
+                foxLegs.frontRight.rotation.x = -legSwing;
+                foxLegs.backLeft.rotation.x = -legSwing;
+                foxLegs.backRight.rotation.x = legSwing;
+
+                // Body bob
+                foxGroup.position.y = Math.abs(Math.sin(foxState.legPhase)) * 0.03;
+
+                // Tail bounce while running
+                tail.rotation.y = Math.sin(foxState.legPhase * 0.5) * 0.3;
+                tail.rotation.x = Math.sin(foxState.legPhase) * 0.1;
+                tailTip.rotation.y = Math.sin(foxState.legPhase * 0.5) * 0.3;
+            }
+
+            // Update position and rotation
+            foxGroup.position.x = foxState.x;
+            foxGroup.position.z = foxState.z;
+            foxGroup.rotation.y = foxState.angle;
         }
 
         // ============================================
@@ -1626,20 +2251,20 @@
         updateTimeOfDay(35);
 
         // ============================================
-        // LABEL VISIBILITY UPDATE
+        // PLAQUE VISIBILITY UPDATE
         // ============================================
-        function updateLabelVisibility() {
+        function updatePlaqueVisibility() {
             const playerPos = camera.position;
 
-            labeledCacti.forEach(({ label, x, z }) => {
+            labeledCacti.forEach(({ plaque, x, z }) => {
                 const dx = playerPos.x - x;
                 const dz = playerPos.z - z;
                 const distance = Math.sqrt(dx * dx + dz * dz);
 
                 if (distance < LABEL_DISTANCE) {
-                    label.userData.element.classList.add('visible');
+                    plaque.userData.element.classList.add('visible');
                 } else {
-                    label.userData.element.classList.remove('visible');
+                    plaque.userData.element.classList.remove('visible');
                 }
             });
         }
@@ -1739,11 +2364,11 @@
                 if (camera.position.z > halfLength) camera.position.z = halfLength;
             }
 
-            // Update minimap
-            updateMinimap();
+            // Update fox
+            updateFox(delta);
 
-            // Update label visibility
-            updateLabelVisibility();
+            // Update plaque visibility
+            updatePlaqueVisibility();
 
             renderer.render(scene, camera);
             labelRenderer.render(scene, camera);
@@ -1759,31 +2384,6 @@
             labelRenderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // Keyboard shortcuts for info
-        const infoPanel = document.getElementById('infoPanel');
-        const cactusInfo = {
-            saguaro: { name: 'Saguaro Cactus', description: 'The iconic giant of the Sonoran Desert. Can live over 150 years and grow up to 40 feet tall.' },
-            barrel: { name: 'Barrel Cactus', description: 'Known for their cylindrical shape. They lean toward the south, earning them the nickname "compass cactus."' },
-            pricklyPear: { name: 'Prickly Pear', description: 'Distinguished by flat, paddle-shaped stems. Both fruit and pads are edible.' },
-            goldenBarrel: { name: 'Golden Barrel', description: 'Called "Mother-in-Law\'s Cushion" due to its fierce golden spines. Endangered in the wild.' },
-            organPipe: { name: 'Organ Pipe Cactus', description: 'Named for their resemblance to pipe organs. They bloom at night with flowers pollinated by bats.' },
-            cholla: { name: 'Cholla Cactus', description: 'Known as "Teddy Bear" or "Jumping" cholla. Covered in dense spines that create a fuzzy appearance. Very painful to touch!' },
-            oldMan: { name: 'Old Man Cactus', description: 'Covered in long white hair-like spines that resemble an old man\'s beard. Native to Mexico and can live 200+ years.' },
-            totemPole: { name: 'Totem Pole Cactus', description: 'A spineless mutation with smooth bumpy columns. Named for its resemblance to Native American totem poles.' },
-            hedgehog: { name: 'Hedgehog Cactus', description: 'Small clustering cactus with short, dense spines. Produces vibrant flowers in spring. Hardy and compact.' }
-        };
-
-        window.addEventListener('keydown', (e) => {
-            if (e.key >= '1' && e.key <= '9') {
-                const types = ['saguaro', 'barrel', 'pricklyPear', 'goldenBarrel', 'organPipe', 'cholla', 'oldMan', 'totemPole', 'hedgehog'];
-                const type = types[parseInt(e.key) - 1];
-                if (cactusInfo[type]) {
-                    infoPanel.innerHTML = `<h3>${cactusInfo[type].name}</h3><p>${cactusInfo[type].description}</p>`;
-                }
-            } else if (e.key === '0') {
-                infoPanel.innerHTML = '<h3>Welcome to the Garden</h3><p>Explore 9 unique cactus species. Walk down the desert street and discover Saguaro, Barrel, Prickly Pear, Golden Barrel, Organ Pipe, Cholla, Old Man, Totem Pole, and Hedgehog cacti.</p>';
-            }
-        });
     </script>
 </body>
 </html>
